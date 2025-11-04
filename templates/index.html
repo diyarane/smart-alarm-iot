@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Alarm Assistant</title>
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(135deg, #c6ffdd, #fbd786, #f7797d);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      width: 350px;
+      text-align: center;
+    }
+    h2 { color: #333; margin-bottom: 1rem; }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 1rem;
+    }
+    button {
+      background: #ff7e5f;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover { background: #eb5757; }
+    .result {
+      margin-top: 20px;
+      font-weight: 500;
+      color: #222;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Smart Alarm Assistant</h2>
+
+    <label>Start Location:</label>
+    <input type="text" id="start" placeholder="e.g., Mumbai">
+
+    <label>Destination:</label>
+    <input type="text" id="end" placeholder="e.g., Pune">
+
+    <button onclick="calculate()">Calculate ETA</button>
+
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    async function calculate() {
+      const start = document.getElementById('start').value.trim();
+      const end = document.getElementById('end').value.trim();
+      const resultDiv = document.getElementById('result');
+
+      if (!start || !end) {
+        resultDiv.innerHTML = "⚠️ Please enter both locations.";
+        return;
+      }
+
+      resultDiv.innerHTML = "⏳ Calculating...";
+
+      const response = await fetch('/calculate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ start, end })
+      });
+
+      const data = await response.json();
+      resultDiv.innerHTML = data.message;
+    }
+  </script>
+</body>
+</html>
