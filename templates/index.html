@@ -12,65 +12,119 @@
     <div class="container">
         <h1><i class="fas fa-alarm-clock"></i> Smart Alarm</h1>
         <p class="subtitle">Calculate the perfect time to wake up based on your schedule and travel time</p>
-        
-        <form id="alarmForm">
-            <div class="input-group">
-                <label><i class="fas fa-clock"></i> Current Alarm Time (Optional)</label>
-                <div class="input-with-icon">
-                    <i class="fas fa-bell"></i>
-                    <input type="time" name="current_alarm" id="current_alarm">
-                </div>
-            </div>
 
-            <div class="input-group">
-                <label><i class="fas fa-flag-checkered"></i> When do you want to arrive?</label>
-                <div class="input-with-icon">
-                    <i class="fas fa-bullseye"></i>
-                    <input type="time" name="arrival_time" id="arrival_time" required>
-                </div>
-            </div>
-
-            <div class="input-group">
-                <label><i class="fas fa-shower"></i> Time to get ready (minutes)</label>
-                <div class="input-with-icon">
-                    <i class="fas fa-user-clock"></i>
-                    <input type="number" name="getting_ready" id="getting_ready" placeholder="e.g. 45" min="1" max="240" required>
-                </div>
-            </div>
-
-            <div class="input-group">
-                <label><i class="fas fa-home"></i> Start Location</label>
-                <div class="autocomplete-container">
-                    <div class="input-with-icon">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <input type="text" id="start_place" name="start_place" placeholder="Enter your starting address" required autocomplete="off">
+        <section class="left-panel">
+            <form id="alarmForm">
+                <div class="section-header"><span class="emoji">🕐</span> Time Setup</div>
+                <div class="time-row">
+                    <div class="input-group">
+                        <label><i class="fas fa-clock"></i> Current Alarm Time (Optional)</label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-bell"></i>
+                            <input type="time" name="current_alarm" id="current_alarm">
+                        </div>
                     </div>
-                    <ul id="start_suggestions" class="suggestions"></ul>
-                </div>
-            </div>
 
-            <div class="input-group">
-                <label><i class="fas fa-building"></i> Destination</label>
-                <div class="autocomplete-container">
-                    <div class="input-with-icon">
-                        <i class="fas fa-location-arrow"></i>
-                        <input type="text" id="end_place" name="end_place" placeholder="Enter your destination" required autocomplete="off">
+                    <div class="input-group">
+                        <label><i class="fas fa-flag-checkered"></i> When do you want to arrive?</label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-bullseye"></i>
+                            <input type="time" name="arrival_time" id="arrival_time" required>
+                        </div>
                     </div>
-                    <ul id="end_suggestions" class="suggestions"></ul>
                 </div>
+                <div class="input-group">
+                    <label for="selected_day"><i class="fas fa-calendar-day"></i> Select Day</label>
+                    <select id="selected_day" name="selected_day">
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label><i class="fas fa-shower"></i> Time to get ready (minutes)</label>
+                    <div class="ready-time-container">
+                        <input type="range" id="getting_ready_slider" min="1" max="240" value="45" aria-label="Ready time slider">
+                        <input type="number" name="getting_ready" id="getting_ready" placeholder="e.g. 45" min="1" max="240" required>
+                    </div>
+                </div>
+                <div class="safety-control">
+                    <label for="bufferSlider">Safety Buffer</label>
+                    <div class="buffer-row">
+                        <input type="range" id="bufferSlider" min="0" max="60" value="15">
+                        <input type="number" id="bufferInput" min="0" max="60" value="15" aria-label="Safety buffer minutes">
+                        <span id="bufferValue">15 min</span>
+                    </div>
+                </div>
+
+                <div class="section-header"><span class="emoji">🚗</span> Locations</div>
+                <div class="input-group">
+                    <label><i class="fas fa-home"></i> Start Location</label>
+                    <div class="autocomplete-container">
+                        <div class="location-input-row">
+                            <div class="input-with-icon">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <input type="text" id="start_place" name="start_place" placeholder="Enter your starting address" required autocomplete="off">
+                            </div>
+                            <button type="button" class="location-btn" data-target="start_place">Use my location</button>
+                        </div>
+                        <ul id="start_suggestions" class="suggestions"></ul>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label><i class="fas fa-building"></i> Destination</label>
+                    <div class="autocomplete-container">
+                        <div class="location-input-row">
+                            <div class="input-with-icon">
+                                <i class="fas fa-location-arrow"></i>
+                                <input type="text" id="end_place" name="end_place" placeholder="Enter your destination" required autocomplete="off">
+                            </div>
+                            <button type="button" class="location-btn" data-target="end_place">Use my location</button>
+                        </div>
+                        <ul id="end_suggestions" class="suggestions"></ul>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn">
+                    <i class="fas fa-calculator"></i>
+                    <span>Calculate Alarm Time</span>
+                </button>
+            </form>
+
+            <div id="alertContainer"></div>
+        </section>
+
+        <section class="right-panel">
+            <div class="results-meta">
+                <div class="traffic-indicator" id="trafficIndicator">🟢 Light traffic confidence</div>
+                <div class="eco-badge">Estimated fuel/CO2: Optimized route</div>
             </div>
-
-            <button type="submit" id="submitBtn">
-                <i class="fas fa-calculator"></i>
-                <span>Calculate Alarm Time</span>
-            </button>
-        </form>
-
-        <div id="alertContainer"></div>
-        
-        <div id="result">
-            <!-- Results will be populated here -->
-        </div>
+            <div class="progress-strip">
+                <span>Get Ready</span>
+                <span>Travel</span>
+                <span>Arrive</span>
+            </div>
+            <div id="result">
+                <!-- Results will be populated here -->
+            </div>
+            <div id="bufferInfoPanel" class="buffer-info-panel">
+                <div class="buffer-card-title">
+                    <span>Why this buffer?</span>
+                    <button type="button" id="bufferInfoToggle" class="info-btn" aria-expanded="false" aria-controls="bufferInfoTooltip">ℹ️</button>
+                </div>
+                <div id="bufferInfoTooltip" class="buffer-info-tooltip">
+                    <div id="bufferTooltipText">Travel Time + Safety Buffer + Traffic Buffer</div>
+                </div>
+                <ul id="bufferRulesList"></ul>
+                <div id="bufferBreakdown" class="buffer-breakdown">Travel Time + Safety Buffer + Traffic Buffer = Total</div>
+            </div>
+        </section>
     </div>
 
     <audio id="alarmAudio" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>

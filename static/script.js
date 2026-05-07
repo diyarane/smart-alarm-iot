@@ -2,12 +2,14 @@ class SmartAlarm {
     constructor() {
         this.debounceTimers = {};
         this.activeRequests = {};
+        this.lastCalculation = null;
         this.init();
     }
 
     init() {
         this.setupEventListeners();
         this.setDefaultTimes();
+        this.setupVisualControls();
         console.log("Smart Alarm initialized");
     }
 
@@ -17,6 +19,11 @@ class SmartAlarm {
         now.setHours(now.getHours() + 1, 0, 0, 0);
         const timeString = now.toTimeString().substring(0, 5);
         document.getElementById('arrival_time').value = timeString;
+        const daySelect = document.getElementById('selected_day');
+        if (daySelect) {
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            daySelect.value = days[new Date().getDay()];
+        }
         console.log("Set default arrival time to:", timeString);
     }
 
@@ -45,8 +52,307 @@ class SmartAlarm {
 
         // Keyboard navigation
         this.setupKeyboardNavigation();
+
+        // Geolocation buttons
+        document.querySelectorAll('.location-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const target = button.getAttribute('data-target');
+                this.handleUseMyLocation(target, button);
+            });
+        });
         
         console.log("Event listeners setup complete");
+    }
+
+    setupVisualControls() {
+        const readyInput = document.getElementById('getting_ready');
+        const readySlider = document.getElementById('getting_ready_slider');
+        const bufferSlider = document.getElementById('bufferSlider');
+        const bufferInput = document.getElementById('bufferInput');
+        const bufferValue = document.getElementById('bufferValue');
+        const arrivalInput = document.getElementById('arrival_time');
+        const daySelect = document.getElementById('selected_day');
+        const bufferInfoToggle = document.getElementById('bufferInfoToggle');
+        const bufferInfoPanel = document.getElementById('bufferInfoPanel');
+        const bufferInfoTooltip = document.getElementById('bufferInfoTooltip');
+
+        if (readyInput && readySlider) {
+            const syncValue = (value) => {
+                const normalized = Math.min(240, Math.max(1, Number(value) || 1));
+                readyInput.value = normalized;
+                readySlider.value = normalized;
+                this.refreshDerivedResults();
+            };
+
+            syncValue(readyInput.value || readySlider.value);
+            readySlider.addEventListener('input', () => syncValue(readySlider.value));
+            readyInput.addEventListener('input', () => syncValue(readyInput.value));
+        }
+
+        if (bufferSlider && bufferValue && bufferInput) {
+            const updateBuffer = () => {
+                bufferValue.textContent = `${bufferSlider.value} min`;
+                bufferInput.value = bufferSlider.value;
+                this.refreshDerivedResults();
+            };
+            const updateFromInput = () => {
+                const value = Math.min(60, Math.max(0, Number(bufferInput.value) || 0));
+                bufferInput.value = value;
+                bufferSlider.value = value;
+                bufferValue.textContent = `${value} min`;
+                this.refreshDerivedResults();
+            };
+            updateFromInput();
+            bufferSlider.addEventListener('input', updateBuffer);
+            bufferInput.addEventListener('input', updateFromInput);
+            bufferInput.addEventListener('change', updateFromInput);
+        }
+
+        if (arrivalInput) {
+            const trafficIndicator = document.getElementById('trafficIndicator');
+            const updateTraffic = () => {
+                if (!trafficIndicator || !arrivalInput.value) return;
+                const { trafficBuffer } = this.getTrafficBufferRules(
+                    daySelect?.value,
+                    arrivalInput.value,
+                    document.getElementById('start_place')?.value,
+                    document.getElementById('end_place')?.value
+                );
+                trafficIndicator.textContent = trafficBuffer >= 15
+                    ? '🔴 Heavy traffic confidence'
+                    : trafficBuffer >= 8
+                        ? '🟡 Moderate traffic confidence'
+                        : '🟢 Light traffic confidence';
+                this.refreshDerivedResults();
+            };
+            updateTraffic();
+            arrivalInput.addEventListener('change', updateTraffic);
+            arrivalInput.addEventListener('input', updateTraffic);
+            daySelect?.addEventListener('change', updateTraffic);
+        }
+
+        document.getElementById('start_place')?.addEventListener('input', () => this.refreshDerivedResults());
+        document.getElementById('end_place')?.addEventListener('input', () => this.refreshDerivedResults());
+        document.getElementById('current_alarm')?.addEventListener('input', () => this.refreshDerivedResults());
+
+        if (bufferInfoToggle && bufferInfoPanel && bufferInfoTooltip) {
+            const openTooltip = () => {
+                bufferInfoTooltip.classList.add('open');
+                bufferInfoToggle.setAttribute('aria-expanded', 'true');
+            };
+            const closeTooltip = () => {
+                bufferInfoTooltip.classList.remove('open');
+                bufferInfoToggle.setAttribute('aria-expanded', 'false');
+            };
+            bufferInfoToggle.addEventListener('click', () => {
+                if (bufferInfoTooltip.classList.contains('open')) {
+                    closeTooltip();
+                } else {
+                    openTooltip();
+                }
+            });
+            bufferInfoToggle.addEventListener('mouseenter', openTooltip);
+            bufferInfoToggle.addEventListener('mouseleave', closeTooltip);
+        }
+    }
+
+    async handleUseMyLocation(targetInputId, button) {
+        if (!navigator.geolocation) {
+            this.showAlert('Geolocation is not supported by this browser.');
+            return;
+        }
+        const targetInput = document.getElementById(targetInputId);
+        if (!targetInput || !button) return;
+
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Locating...';
+
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const lat = position.coords.latitude.toFixed(5);
+            const lng = position.coords.longitude.toFixed(5);
+            const latLngValue = `${lat}, ${lng}`;
+
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+                if (!response.ok) throw new Error('Reverse geocode failed');
+                const data = await response.json();
+                targetInput.value = data.display_name || latLngValue;
+            } catch (err) {
+                targetInput.value = latLngValue;
+                console.warn('Reverse geocoding unavailable:', err);
+            } finally {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        }, (error) => {
+            button.disabled = false;
+            button.textContent = originalText;
+            if (error.code === error.PERMISSION_DENIED) {
+                this.showAlert('Location access denied. Please enable location permission.', 'error');
+            } else {
+                this.showAlert('Unable to fetch your location. Please try again.', 'error');
+            }
+        });
+    }
+
+    getTrafficBufferRules(selectedDay, arrivalTime, startPlace = '', endPlace = '') {
+        const rules = [];
+        if (!arrivalTime) return { trafficBuffer: 0, rules };
+        const [hour, minute] = arrivalTime.split(':').map(Number);
+        const totalMinutes = hour * 60 + minute;
+        const day = selectedDay || 'Sunday';
+        let trafficBuffer = 0;
+
+        const isWeekday = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].includes(day);
+        const addRule = (label, min, max) => {
+            const spread = max - min;
+            const step = spread === 0 ? 0 : (minute % (spread + 1));
+            const value = min + step;
+            rules.push(`${label}: +${value} min`);
+            return value;
+        };
+
+        if (day === 'Sunday') {
+            rules.push('Sunday: +0 min');
+            return { trafficBuffer, rules };
+        }
+
+        if (isWeekday && totalMinutes >= 480 && totalMinutes <= 630) {
+            trafficBuffer += addRule(`${day} 8-10 AM office rush`, 15, 25);
+        }
+
+        if (isWeekday && totalMinutes >= 1050 && totalMinutes <= 1170) {
+            trafficBuffer += addRule(`${day} evening rush (5-7pm)`, 12, 20);
+        }
+
+        if (day === 'Saturday' && totalMinutes >= 600 && totalMinutes <= 780) {
+            trafficBuffer += addRule('Saturday shopping rush', 8, 12);
+        }
+
+        const startNorm = (startPlace || '').toLowerCase();
+        const endNorm = (endPlace || '').toLowerCase();
+        if (startNorm.includes('viman') && endNorm.includes('kothrud')) {
+            trafficBuffer += 5;
+            rules.push('Viman Nagar → Kothrud route: +5 min');
+        }
+
+        if (rules.length === 0) {
+            rules.push(`${day}: +0 min`);
+        }
+
+        return { trafficBuffer, rules };
+    }
+
+    toMinutes(timeString) {
+        const [h, m] = timeString.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    toTime(minutes) {
+        const normalized = ((minutes % 1440) + 1440) % 1440;
+        const hh = String(Math.floor(normalized / 60)).padStart(2, '0');
+        const mm = String(normalized % 60).padStart(2, '0');
+        return `${hh}:${mm}`;
+    }
+
+    refreshDerivedResults() {
+        if (!this.lastCalculation) return;
+
+        const resultDiv = document.getElementById('result');
+        const arrivalTime = document.getElementById('arrival_time').value || this.lastCalculation.arrival_time;
+        const gettingReady = Number(document.getElementById('getting_ready').value || this.lastCalculation.getting_ready || 0);
+        const safetyBuffer = Number(document.getElementById('bufferSlider').value || 0);
+        const selectedDay = document.getElementById('selected_day')?.value;
+        const travelTime = Number(this.lastCalculation.eta || 0);
+        const { trafficBuffer, rules } = this.getTrafficBufferRules(
+            selectedDay,
+            arrivalTime,
+            document.getElementById('start_place')?.value,
+            document.getElementById('end_place')?.value
+        );
+
+        const totalBuffer = travelTime + safetyBuffer + trafficBuffer;
+        const departBy = this.toTime(this.toMinutes(arrivalTime) - totalBuffer);
+        const alarmTime = this.toTime(this.toMinutes(arrivalTime) - (gettingReady + totalBuffer));
+
+        this.renderResult({
+            arrivalTime,
+            gettingReady,
+            travelTime,
+            safetyBuffer,
+            trafficBuffer,
+            totalBuffer,
+            departBy,
+            alarmTime,
+            currentAlarm: document.getElementById('current_alarm').value || this.lastCalculation.current_alarm,
+            rules
+        });
+
+        resultDiv.style.display = 'block';
+        this.scheduleAlarm(alarmTime);
+    }
+
+    renderResult(payload) {
+        const resultDiv = document.getElementById('result');
+        const rulesList = document.getElementById('bufferRulesList');
+        const breakdown = document.getElementById('bufferBreakdown');
+
+        let comparisonHtml = '';
+        if (payload.currentAlarm) {
+            comparisonHtml = `
+                <div class="time-comparison">
+                    <div class="time-box current">
+                        <div>Current Alarm</div>
+                        <div class="time-value">${payload.currentAlarm}</div>
+                    </div>
+                    <div class="time-box new">
+                        <div>Recommended Alarm</div>
+                        <div class="time-value">${payload.alarmTime}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        resultDiv.innerHTML = `
+            <div class="result-item">
+                <div class="result-label"><i class="fas fa-flag-checkered"></i> Arrival Time</div>
+                <div class="result-value">${payload.arrivalTime}</div>
+            </div>
+            <div class="result-item">
+                <div class="result-label"><i class="fas fa-sign-out-alt"></i> Depart by</div>
+                <div class="result-value">${payload.departBy}</div>
+            </div>
+            <div class="result-item">
+                <div class="result-label"><i class="fas fa-car"></i> Travel Time</div>
+                <div class="result-value">${payload.travelTime} minutes</div>
+            </div>
+            <div class="result-item">
+                <div class="result-label"><i class="fas fa-shield-alt"></i> Safety Buffer</div>
+                <div class="result-value">${payload.safetyBuffer + payload.trafficBuffer} minutes</div>
+            </div>
+            <div class="result-item">
+                <div class="result-label"><i class="fas fa-layer-group"></i> Total Buffer</div>
+                <div class="result-value">${payload.totalBuffer} minutes</div>
+            </div>
+            ${comparisonHtml}
+            <div class="final-alarm">
+                <div class="result-label"><i class="fas fa-bell"></i> SET YOUR ALARM FOR</div>
+                <div class="result-value">${payload.alarmTime}</div>
+            </div>
+        `;
+
+        if (rulesList) {
+            const fullRules = [...payload.rules, `Safety buffer (user set): +${payload.safetyBuffer} min`];
+            rulesList.innerHTML = fullRules.map(rule => `<li>${rule}</li>`).join('');
+        }
+        if (breakdown) {
+            breakdown.textContent = `${payload.travelTime} (Travel Time) + ${payload.safetyBuffer} (Safety Buffer) + ${payload.trafficBuffer} (Traffic Buffer) = ${payload.totalBuffer} (Total Buffer)`;
+        }
+        const tooltipText = document.getElementById('bufferTooltipText');
+        if (tooltipText) {
+            tooltipText.textContent = `Travel Time: ${payload.travelTime} minutes (based on route), Safety Buffer: ${payload.safetyBuffer} minutes (user set), Traffic Buffer: ${payload.trafficBuffer} minutes (based on day + time rules), Total Buffer: ${payload.totalBuffer} minutes`;
+        }
     }
 
     setupKeyboardNavigation() {
@@ -294,8 +600,9 @@ class SmartAlarm {
             if (data.error) {
                 this.showAlert(data.error);
             } else {
-                this.displayResults(data);
-                this.scheduleAlarm(data.alarm_time);
+                this.lastCalculation = data;
+                this.refreshDerivedResults();
+                this.showAlert('Alarm time calculated successfully!', 'success');
             }
 
         } catch (error) {
@@ -312,51 +619,8 @@ class SmartAlarm {
     }
 
     displayResults(data) {
-        const resultDiv = document.getElementById('result');
-        
-        let comparisonHtml = '';
-        if (data.current_alarm) {
-            comparisonHtml = `
-                <div class="time-comparison">
-                    <div class="time-box current">
-                        <div>Current Alarm</div>
-                        <div class="time-value">${data.current_alarm}</div>
-                    </div>
-                    <div class="time-box new">
-                        <div>Recommended Alarm</div>
-                        <div class="time-value" style="color: var(--success);">${data.alarm_time}</div>
-                    </div>
-                </div>
-            `;
-        }
-
-        resultDiv.innerHTML = `
-            <div class="result-item">
-                <div class="result-label"><i class="fas fa-flag-checkered"></i> Arrival Time</div>
-                <div class="result-value">${data.arrival_time}</div>
-            </div>
-            <div class="result-item">
-                <div class="result-label"><i class="fas fa-shower"></i> Getting Ready</div>
-                <div class="result-value">${data.getting_ready} minutes</div>
-            </div>
-            <div class="result-item">
-                <div class="result-label"><i class="fas fa-car"></i> Travel Time</div>
-                <div class="result-value">${data.eta} minutes</div>
-            </div>
-            <div class="result-item">
-                <div class="result-label"><i class="fas fa-shield-alt"></i> Safety Buffer</div>
-                <div class="result-value">${data.margin} minutes</div>
-            </div>
-            ${comparisonHtml}
-            <div class="final-alarm">
-                <div class="result-label"><i class="fas fa-bell"></i> SET YOUR ALARM FOR</div>
-                <div class="result-value">${data.alarm_time}</div>
-            </div>
-        `;
-        
-        resultDiv.style.display = 'block';
-        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        this.showAlert('Alarm time calculated successfully!', 'success');
+        this.lastCalculation = data;
+        this.refreshDerivedResults();
     }
 
     scheduleAlarm(alarmTime) {
