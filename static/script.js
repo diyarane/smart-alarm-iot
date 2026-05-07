@@ -315,30 +315,36 @@ class SmartAlarm {
         }
 
         resultDiv.innerHTML = `
-            <div class="result-item">
+            <div class="result-item compact-item">
                 <div class="result-label"><i class="fas fa-flag-checkered"></i> Arrival Time</div>
                 <div class="result-value">${payload.arrivalTime}</div>
             </div>
-            <div class="result-item">
+            <div class="result-item compact-item">
                 <div class="result-label"><i class="fas fa-sign-out-alt"></i> Depart by</div>
                 <div class="result-value">${payload.departBy}</div>
             </div>
-            <div class="result-item">
-                <div class="result-label"><i class="fas fa-car"></i> Travel Time</div>
-                <div class="result-value">${payload.travelTime} minutes</div>
-            </div>
-            <div class="result-item">
-                <div class="result-label"><i class="fas fa-shield-alt"></i> Safety Buffer</div>
-                <div class="result-value">${payload.safetyBuffer + payload.trafficBuffer} minutes</div>
-            </div>
-            <div class="result-item">
-                <div class="result-label"><i class="fas fa-layer-group"></i> Total Buffer</div>
-                <div class="result-value">${payload.totalBuffer} minutes</div>
+            <div class="total-buffer-hero">
+                <div class="total-buffer-label">TOTAL EXTRA TIME</div>
+                <div class="total-buffer-value">${payload.totalBuffer}</div>
+                <div class="total-buffer-unit">minutes of extra buffer</div>
+                <div class="total-buffer-formula">Travel (${payload.travelTime}) + Safety (${payload.safetyBuffer}) + Traffic (${payload.trafficBuffer}) = ${payload.totalBuffer}</div>
             </div>
             ${comparisonHtml}
             <div class="final-alarm">
                 <div class="result-label"><i class="fas fa-bell"></i> SET YOUR ALARM FOR</div>
                 <div class="result-value">${payload.alarmTime}</div>
+            </div>
+            <div class="result-item">
+                <div class="result-label"><i class="fas fa-car"></i> Travel Time</div>
+                <div class="result-value travel-secondary">${payload.travelTime} minutes</div>
+            </div>
+            <div class="result-item">
+                <div class="result-label"><i class="fas fa-user-pen"></i> Safety Buffer <i class="fas fa-pen"></i></div>
+                <div class="result-value safety-secondary">${payload.safetyBuffer} minutes</div>
+            </div>
+            <div class="result-item">
+                <div class="result-label"><i class="fas fa-shield-alt"></i> Safety Buffer</div>
+                <div class="result-value safety-secondary">${payload.safetyBuffer + payload.trafficBuffer} minutes total</div>
             </div>
         `;
 
@@ -347,7 +353,7 @@ class SmartAlarm {
             rulesList.innerHTML = fullRules.map(rule => `<li>${rule}</li>`).join('');
         }
         if (breakdown) {
-            breakdown.textContent = `${payload.travelTime} (Travel Time) + ${payload.safetyBuffer} (Safety Buffer) + ${payload.trafficBuffer} (Traffic Buffer) = ${payload.totalBuffer} (Total Buffer)`;
+            breakdown.textContent = `${payload.travelTime} (Travel Time) + ${payload.safetyBuffer} (Safety Buffer) + ${payload.trafficBuffer} (Traffic Buffer) = ${payload.totalBuffer} (Total Buffer extra time)`;
         }
         const tooltipText = document.getElementById('bufferTooltipText');
         if (tooltipText) {
